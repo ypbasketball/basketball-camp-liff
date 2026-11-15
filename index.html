@@ -306,7 +306,7 @@ document.addEventListener('click', e => {
 
 const GRADES = ['幼稚園', '小一', '小二', '小三', '小四', '小五', '小六', '國一', '國二', '國三', '高中'];
 const gradeOpts = [['', '未填']].concat(GRADES.map(g => [g, g]));
-const FE_VER = '2026-11-15-r101';
+const FE_VER = '2026-11-15-r102';
 const GUIDE = {
   parent: [
     ['🎒 第一次使用：綁定孩子', ['輸入總教練給你的 6 碼「綁定碼」。', '第一次要填「家長真實姓名」和「聯絡電話」。', '有兄弟姊妹用同一組綁定碼，一次就全部綁好。', '爸爸媽媽可以各用自己的 LINE 綁同一位孩子。']],
@@ -1240,28 +1240,67 @@ function renderMemoBox() {
 }
 
 // 總教練點擊「💵 現場收取現金」彈出對話框
-async function cashPayUi() {
-  const stus = S.adm.students || [];
-  if (!stus.length) throw new Error('目前尚無學員資料');
-
-  const v = await dialog('💵 補登收款（匯款／現金）', [
-    { key: 'method', label: '付款方式', type: 'select', value: '匯款', options: [['匯款', '匯款（已轉帳）'], ['現金', '現金（現場收取）']] },
-    { key: 'studentId', label: '學員', type: 'select', options: stus.map(s => [s.id, `${stuLabel(s)}${s.grp ? '・' + s.grp : ''}・目前剩${s.balance}堂`]) },
-    { key: 'period', label: '繳費期別（一次報多期，選第一期）', type: 'select', value: (S.adm.financeP || {}).current || '', options: ((S.adm.periodsAll || []).map(p => [p, p])).concat([['試上', '試上（1 堂，興趣班 400／其他 500）'], ['中途插班', '中途插班繳費（自訂堂數）']]) },
-    { key: 'terms', label: '報名期數（試上、插班不用管）', type: 'select', value: '1', options: [['1', '1 期（7 堂）'], ['2', '一次報 2 期（14 堂）']] },
-    { key: 'campPer', label: '🏕️ 營隊學員才選：繳費期別（營隊不加堂，上面「繳費期別、期數、堂數」不用管）', type: 'select', value: '', options: [['', '（不是營隊學員，免選）'], ['ALL', '兩期都繳（第一期＋第二期）']].concat([...new Set(stus.filter(s => s.camp).flatMap(s => (s.campPeriods || []).map(z => z.period)))].map(p => [p, p + ' 一期']))},
-    { key: 'shirts', label: '營隊另購短 T 件數（沒有就免填）', type: 'number', ph: '例如 1', value: '' },
-    { key: 'amount', label: '實收金額', type: 'number', ph: '例如: 4200 (插班依比例填寫)' },
-    { key: 'last5', label: '匯款帳號後五碼（匯款才填）', ph: '5 碼數字，現金免填' },
-    { key: 'date', label: '轉帳／收款日期', type: 'date', value: today() },
-    { key: 'lessons', label: '增加堂數（已經加過堂數、只要記帳就填 0）', type: 'number', ph: '只記帳填 0；要加堂：1 期 7、2 期 14、試上 1', value: '0' },
-    { key: 'note', label: '備註說明', ph: '例如: 表單報名後匯款 / 現場交付現金', value: '' }
-  ], '確認入帳並加堂');
-
+async function cashPayUi() { // 補登收款：先選「這筆收的是什麼」→ 再選班級 → 再選學員，只顯示跟這個項目有關的欄位
+  const all = (S.adm.students || []).filter(s => s.status !== '結業' || true);
+  if (!all.length) throw new Error('目前尚無學員資料');
+  const type = await menu('💵 補登收款：這筆收的是什麼？', [
+    ['shirt', '👕 加購衣服（只記帳，不加堂）'],
+    ['single', '🎫 單堂／中途插班（自訂堂數）'],
+    ['trial', '🆕 試上費'],
+    ['reg', '🏀 常態班整期學費'],
+    ['camp', '🏕️ 冬令營（含短 T）']]);
+  if (!type) return;
+  let pool = type === 'camp' ? all.filter(s => s.camp) : type === 'reg' ? all.filter(s => !s.camp && s.status !== '結業') : type === 'shirt' ? all : all.filter(s => !s.camp);
+  if (!pool.length) throw new Error(type === 'camp' ? '目前沒有冬令營學員' : '目前沒有符合的學員');
+  const cn = {}; pool.forEach(s => { const k = s.className || '（未分班）'; cn[k] = (cn[k] || 0) + 1; });
+  const ckeys = Object.keys(cn);
+  if (ckeys.length > 1) { // 班級多時先選班級，學員選單就不會太長
+    const pick = await menu('先選班級', ckeys.map(k => [k, k + '（' + cn[k] + ' 位）']));
+    if (!pick) return;
+    pool = pool.filter(s => (s.className || '（未分班）') === pick);
+  }
+  const stuOpt = pool.map(s => [s.id, s.name + (s.grp ? '・' + s.grp : '') + (s.kind ? '・' + s.kind : '') + '・剩' + s.balance + '堂']);
+  const F = {
+    method: { key: 'method', label: '付款方式', type: 'select', value: '匯款', options: [['匯款', '匯款（已轉帳）'], ['現金', '現金（現場收取）']] },
+    stu: { key: 'studentId', label: '學員', type: 'select', options: stuOpt },
+    amt: ph => ({ key: 'amount', label: '實收金額', type: 'number', ph: ph }),
+    l5: { key: 'last5', label: '匯款帳號後五碼（匯款才填，現金免填）', ph: '5 碼數字' },
+    dt: { key: 'date', label: '收款日期', type: 'date', value: today() },
+    note: v => ({ key: 'note', label: '備註說明', ph: '', value: v || '' })
+  };
+  let fields, title, base = {}, ok = '確認入帳';
+  if (type === 'shirt') {
+    title = '👕 加購衣服（只記帳，不加堂）'; base = { period: '加購衣服', terms: '1', lessons: '0', campPer: '', shirts: '' };
+    fields = [F.method, F.stu, F.amt('例如 450'), F.l5, F.dt, F.note('加購衣服　尺寸：　件數：')];
+  } else if (type === 'single') {
+    title = '🎫 單堂／中途插班'; base = { period: '中途插班', terms: '1', campPer: '', shirts: '' };
+    fields = [F.method, F.stu, F.amt('例如 500'), F.l5, F.dt,
+      { key: 'lessons', label: '增加堂數（單堂學員：新增上課日期時系統已經加 1 堂，這裡填 0）', type: 'number', ph: '要另外加堂才填', value: '0' }, F.note('單堂')];
+  } else if (type === 'trial') {
+    title = '🆕 試上費'; base = { period: '試上', terms: '1', lessons: '0', campPer: '', shirts: '' };
+    fields = [F.method, F.stu, F.amt('興趣班 400／其他 500'), F.l5, F.dt, F.note('試上')];
+  } else if (type === 'reg') {
+    title = '🏀 常態班整期學費'; base = { campPer: '', shirts: '' };
+    fields = [F.method, F.stu,
+      { key: 'period', label: '繳費期別（一次報多期，選第一期）', type: 'select', value: (S.adm.financeP || {}).current || '', options: (S.adm.periodsAll || []).map(p => [p, p]) },
+      { key: 'terms', label: '報名期數', type: 'select', value: '1', options: [['1', '1 期（7 堂）'], ['2', '一次報 2 期（14 堂）']] },
+      F.amt('例如 4200'), F.l5, F.dt,
+      { key: 'lessons', label: '增加堂數（已經加過、只想記帳填 0；1 期 7、2 期 14）', type: 'number', ph: '', value: '0' }, F.note('')];
+  } else {
+    title = '🏕️ 冬令營收款（營隊不加堂）'; base = { period: '', terms: '1', lessons: '0' };
+    const labs = {}; pool.forEach(s => (s.campPeriods || []).forEach(z => { labs[z.period] = z.label || z.period; }));
+    const per = Object.keys(labs);
+    fields = [F.method, F.stu,
+      { key: 'campPer', label: '繳哪幾期', type: 'select', value: per.length > 1 ? 'ALL' : (per[0] || ''), options: (per.length > 1 ? [['ALL', '兩期都繳（' + per.map(q => labs[q]).join('＋') + '）']] : []).concat(per.map(q => [q, '只繳 ' + labs[q]])) },
+      { key: 'shirts', label: '另購短 T 件數（沒有就空白）', type: 'number', ph: '例如 1', value: '' },
+      F.amt('例如 3200'), F.l5, F.dt, F.note('')];
+  }
+  const v = await dialog(title, fields, ok);
   if (!v) return;
-  await api('cashPay', v);
+  const body = Object.assign({}, base, v); if (type === 'camp') body.period = body.campPer === 'ALL' ? '一次報名兩期' : body.campPer;
+  await api('cashPay', body);
   render();
-  setTimeout(() => toast(Number(v.lessons) > 0 ? '已入帳，學員堂數已自動累加！' : '已記帳（未加堂）'), 100);
+  setTimeout(() => toast(type === 'shirt' ? '已記帳（衣服）' : Number(body.lessons) > 0 ? '已入帳，學員堂數已自動累加！' : '已記帳（未加堂）'), 100);
 }
 
 const stuLabel = s => s.name + (String(s.name).indexOf(s.className) !== -1 || !s.className ? '' : '（' + s.className + '）'); // 名字已經帶班級（例如「張愷威（冬令營B班）」）就不重複
