@@ -141,10 +141,19 @@ const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tai
 const parts = d => d.split('-').map(Number);
 const dow = d => { const [y, m, dd] = parts(d); const w = new Date(Date.UTC(y, m - 1, dd)).getUTCDay(); return w === 0 ? 7 : w; };
 const addDays = (d, n) => { const [y, m, dd] = parts(d); return new Date(Date.UTC(y, m - 1, dd + n)).toISOString().slice(0, 10); };
-const foldCard = (key, title, body, n, top = '') => `<section class="card" style="padding:0;overflow:hidden"><details ${S.fold && S.fold[key] ? 'open' : ''} ontoggle="(S.fold = S.fold || {})['${key}'] = this.open"><summary style="cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 16px"><h2 style="margin:0;font-size:16px">${title}</h2><span style="display:flex;align-items:center;gap:8px;white-space:nowrap">${n != null ? `<span style="background:#fff1e0;color:var(--pri);border-radius:999px;padding:2px 10px;font-size:13px;font-weight:800">${n}</span>` : ''}<span class="muted" style="margin:0;font-size:13px">▾</span></span></summary>${top ? `<div style="padding:0 16px 12px;display:flex;justify-content:flex-end">${top}</div>` : ''}<div style="padding:4px 16px 16px;border-top:1px solid #f3e8da">${body}</div></details></section>`;
+const foldCard = (key, title, body, n, top = '', defOpen = false) => `<section class="card" style="padding:0;overflow:hidden"><details ${S.fold && S.fold[key] !== undefined ? (S.fold[key] ? 'open' : '') : (defOpen ? 'open' : '')} ontoggle="(S.fold = S.fold || {})['${key}'] = this.open"><summary style="cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 16px"><h2 style="margin:0;font-size:16px">${title}</h2><span style="display:flex;align-items:center;gap:8px;white-space:nowrap">${n != null ? `<span style="background:#fff1e0;color:var(--pri);border-radius:999px;padding:2px 10px;font-size:13px;font-weight:800">${n}</span>` : ''}<span class="muted" style="margin:0;font-size:13px">▾</span></span></summary>${top ? `<div style="padding:0 16px 12px;display:flex;justify-content:flex-end">${top}</div>` : ''}<div style="padding:4px 16px 16px;border-top:1px solid #f3e8da">${body}</div></details></section>`;
 const card = (t, b, x = '') => `<section class="card"><h2>${t}${x}</h2>${b}</section>`;
 const NEWTAG = '<span class="pill" style="background:#ef4444;color:#fff;font-weight:800;margin:0 6px 4px 0;animation:newpulse 1.4s infinite">🆕 NEW</span>';
-const anch = (id, h) => `<div id="${id}">${h}</div>`;
+const anch = (id, h) => { // 待審核卡片：可收合；有東西（標題旁數字 > 0）就顯示紅色 NEW 並預設展開，沒東西預設收起來
+  const m = /^\s*<section class="card"><h2>([\s\S]*?)<\/h2>([\s\S]*)<\/section>\s*$/.exec(h || '');
+  if (!m) return `<div id="${id}">${h}</div>`;
+  const c = /pill warn">\s*(\d+)/.exec(m[1]), n = c ? Number(c[1]) : 0;
+  return `<div id="${id}">${foldCard(id, (n > 0 ? NEWTAG : '') + m[1], m[2], null, '', n > 0)}</div>`;
+};
+const openFold = e => { // 跳到某一筆前，先把它外面的收合卡片展開
+  let d = e && e.closest ? e.closest('details') : null; while (d) { d.open = true; d = d.parentElement ? d.parentElement.closest('details') : null; }
+  if (e && e.querySelector && !e.closest('details')) { const k = e.querySelector('details'); if (k) k.open = true; }
+};
 const foldify = (key, html, n) => { const m = /^\s*<section class="card"><h2>([\s\S]*?)<\/h2>([\s\S]*)<\/section>\s*$/.exec(html || ''); return m ? foldCard(key, m[1], m[2], n) : html; };
 function todoBar(a) { // 一進後台就看到：每一件待處理都是一顆按鈕（寫著名字），點了就跳到那一筆
   const lv = (S.adm && S.adm.leaves) || [], md2 = d => String(d || '').slice(5).replace('-', '/');
@@ -159,7 +168,7 @@ function todoBar(a) { // 一進後台就看到：每一件待處理都是一顆�
   if (!tot) return '<div class="card" style="text-align:center;color:var(--ok);font-weight:800">✅ 目前沒有待處理的事項</div>';
   return `<div class="card" style="border:2px solid #ef4444;background:#fff5f5"><div style="font-weight:900;font-size:16px">🔔 你有 ${tot} 件待處理 ${NEWTAG}</div><div class="muted" style="margin:2px 0 0;font-size:12.5px">按橘色按鈕跳到那一區，按名字跳到那一筆</div>${groups.map(g => sec(g[0], g[1], g[2])).join('')}</div>`;
 }
-function flashEl(e) { if (!e) return; e.scrollIntoView({ behavior: 'smooth', block: 'start' }); const o = e.style.boxShadow; e.style.transition = 'box-shadow .3s'; e.style.boxShadow = '0 0 0 3px #f97316'; setTimeout(() => { e.style.boxShadow = o; }, 2000); } // 跳到那一筆並閃一下橘框
+function flashEl(e) { if (!e) return; openFold(e); e.scrollIntoView({ behavior: 'smooth', block: 'start' }); const o = e.style.boxShadow; e.style.transition = 'box-shadow .3s'; e.style.boxShadow = '0 0 0 3px #f97316'; setTimeout(() => { e.style.boxShadow = o; }, 2000); } // 跳到那一筆並閃一下橘框
 function goTo(id) { flashEl(document.getElementById(id)); }
 function goCamp(k) { flashEl([...document.querySelectorAll('[data-ca]')].find(x => x.dataset.ca === k)); }
 const pill = s => `<span class="pill ${/退回|拒絕|缺席/.test(s) ? 'bad' : /取消/.test(s) ? 'gray' : /待/.test(s) ? 'warn' : ''}">${esc(s)}</span>`;
@@ -306,7 +315,7 @@ document.addEventListener('click', e => {
 
 const GRADES = ['幼稚園', '小一', '小二', '小三', '小四', '小五', '小六', '國一', '國二', '國三', '高中'];
 const gradeOpts = [['', '未填']].concat(GRADES.map(g => [g, g]));
-const FE_VER = '2026-11-15-r102';
+const FE_VER = '2026-11-15-r103';
 const GUIDE = {
   parent: [
     ['🎒 第一次使用：綁定孩子', ['輸入總教練給你的 6 碼「綁定碼」。', '第一次要填「家長真實姓名」和「聯絡電話」。', '有兄弟姊妹用同一組綁定碼，一次就全部綁好。', '爸爸媽媽可以各用自己的 LINE 綁同一位孩子。']],
@@ -1367,7 +1376,7 @@ async function viewAdmin() {
     todoBar(a) +
     boardCard(s) +
     campAppsCard(a) +
-    overviewCard(a) +
+    foldify('ov', overviewCard(a)) +
     foldify('sch', scheduleCardAdmin(a)) +
     // 待審核繳費卡片：標題右側新增「💵 現場收取現金」快捷鍵 +
     anch('a_pay', card('💳 待審核繳費' + ((a.payments || []).length ? ` <span class="pill warn">${a.payments.length}</span>` : ''), `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px"><button class="ghost mini" onclick="run(this,cashPayUi)">💵 補登收款</button><button class="ghost mini" onclick="run(this,markCashUi)">📝 標記現金（還沒收到）</button></div>` + ((a.payments || []).map(p => `<div class="item" style="border-left:4px solid #ef4444" id="pay_item_${esc(p.id)}">${NEWTAG}<br>
@@ -1391,7 +1400,7 @@ async function viewAdmin() {
     foldify('sal', card('💵 教練授課時數與薪資', ((a.salaryKeys || []).length ? `<select onchange="S.salKey=this.value;render()">${a.salaryKeys.map(k => `<option value="${esc(k)}" ${k === S.salKey ? 'selected' : ''}>${esc(k)}${(a.periodLabels || {})[k] ? '（' + esc(a.periodLabels[k]) + '）' : ''}</option>`).join('')}</select>` : `<input type="month" value="${esc(S.salKey)}" onchange="S.salKey=this.value;render()">`) + `
       ${locked ? `<div class="lockbar">🔒 已由 ${esc(locked.by)} 於 ${esc(locked.time)} 月結鎖定，以下為鎖定當時的金額</div>` : ''}
       ${coachHtml}<div class="btns">${salaryBtns}</div>`)) +
-    card('📋 出勤備忘錄（已核准名單）', `<div id="memo_container"></div>`) +
+    foldCard('memo', '📋 出勤備忘錄（已核准名單）', `<div id="memo_container"></div>`) +
     foldCard('stu', '⛹️ 全部學員名冊', `<input type="search" placeholder="🔍 搜尋姓名／班級／編號" oninput="filterStu(this.value)">` +
       ((a.students || []).map(x => `<div class="row stu-row" data-q="${esc((x.name + x.id + x.className + (x.grp || '') + (x.grade || '')).toLowerCase())}"><div>
         <b>${esc(x.name)}</b> <span class="muted">${esc(x.className)}${x.grp ? '・' + esc(x.grp) : ''}${x.grade ? '・' + esc(x.grade) : ''}${x.kind ? '・' + esc(x.kind) : ''}</span>
@@ -1399,9 +1408,9 @@ async function viewAdmin() {
         <div style="display:flex;align-items:center;gap:8px">${balPill(x.balance)}<button class="ghost mini" data-act="manageStu" data-id="${esc(x.id)}">管理</button></div></div>`).join('') || '<p class="muted">尚無學員資料</p>'), (a.students || []).length + ' 位', `<button class="ghost mini" onclick="run(this,addStudentUi)">＋ 新增學員</button>`) +
     foldCard('adj', '🧾 最近堂數調整', (a.adjustLogs || []).map(r => `<div class="row"><span>${esc(r.date)} <b>${esc(r.name)}</b> <span class="muted">${esc(r.reason)}・${esc(r.by)}</span></span>
       <span class="pill ${r.delta < 0 ? 'bad' : ''}">${r.delta > 0 ? '+' : ''}${r.delta} → ${r.after}</span></div>`).join('') || '<p class="muted">尚無調整紀錄</p>', (a.adjustLogs || []).length + ' 筆') +
-    card('🗂️ 最近點名紀錄', (a.recent || []).map(r => `<div class="row"><span>${esc(r.date)} <b>${esc(r.name)}</b> <span class="muted">${esc(r.className)}・${esc(r.by)}</span></span>${pill(r.status)}</div>`).join('') || '<p class="muted">尚無點名紀錄</p>') +
-    financeCard(a) +
-    noticeCardAdmin(a) +
+    foldify('rec', card('🗂️ 最近點名紀錄', (a.recent || []).map(r => `<div class="row"><span>${esc(r.date)} <b>${esc(r.name)}</b> <span class="muted">${esc(r.className)}・${esc(r.by)}</span></span>${pill(r.status)}</div>`).join('') || '<p class="muted">尚無點名紀錄</p>')) +
+    foldify('fin', financeCard(a)) +
+    foldify('ntc', noticeCardAdmin(a)) +
     foldCard('ops', '🧾 操作紀錄（最近 30 筆）', (a.opLogs || []).slice(0, 30).map(r => `<div class="row" style="padding:8px 0"><div><b>${esc(r.action)}</b>・${esc(r.target)}
       <div class="muted" style="margin:0;font-size:12.5px">${esc(r.by)} ${esc(r.at)}${r.detail ? '｜' + esc(r.detail) : ''}</div></div></div>`).join('') || '<p class="muted">尚無操作紀錄</p>', Math.min(30, (a.opLogs || []).length) + ' 筆');
 
