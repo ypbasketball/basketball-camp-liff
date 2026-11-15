@@ -306,7 +306,7 @@ document.addEventListener('click', e => {
 
 const GRADES = ['幼稚園', '小一', '小二', '小三', '小四', '小五', '小六', '國一', '國二', '國三', '高中'];
 const gradeOpts = [['', '未填']].concat(GRADES.map(g => [g, g]));
-const FE_VER = '2026-11-14-r100';
+const FE_VER = '2026-11-15-r101';
 const GUIDE = {
   parent: [
     ['🎒 第一次使用：綁定孩子', ['輸入總教練給你的 6 碼「綁定碼」。', '第一次要填「家長真實姓名」和「聯絡電話」。', '有兄弟姊妹用同一組綁定碼，一次就全部綁好。', '爸爸媽媽可以各用自己的 LINE 綁同一位孩子。']],
@@ -397,7 +397,7 @@ function viewBind() {
 // ===================== 家長專區 =====================
 function stuById(id) { return (S.me.students || []).find(s => s.studentId === id); }
 function classDates(st, n = 10) {
-  if (st.kind === '補課' || st.kind === '試上') return []; // 補課／試上學員不是每週固定上課，沒有固定日程
+  if (st.kind === '補課' || st.kind === '試上' || st.kind === '單堂') return []; // 補課／試上學員不是每週固定上課，沒有固定日程
   const out = []; let d = today();
   if (st.classStart && st.classStart > d) d = st.classStart;
   for (let i = 0; i < 180 && out.length < n; i++, d = addDays(d, 1)) {
@@ -601,7 +601,7 @@ async function viewParent() {
         ${p.logs ? `<div class="muted" style="color:var(--ok);font-size:13px;margin:0">${esc(p.logs)}</div>` : ''}
         ${p.note ? `<div class="muted" style="color:var(--bad);font-size:13px;margin:0">說明：${esc(p.note)}</div>` : ''}${cancelBtn(p)}</div>${pill(p.status)}</div>`).join('') +
       (h.leaves || []).filter(l => S.curKid === 'ALL' || l.studentId === S.curKid).map(l => `<div class="row"><div>
-        <b>${esc(l.type === '補課' && (l.kind === '試上' || l.kind === '補課生') ? l.kind : l.type)} ${esc(l.date)}・${esc(l.studentName)}</b>${l.type === '請假' && l.kind ? ` <span class="pill ${l.kind === '病假' ? '' : 'warn'}">${esc(l.kind)}</span>` : ''}
+        <b>${esc(l.type === '補課' && (l.kind === '試上' || l.kind === '補課生' || l.kind === '單堂') ? l.kind : l.type)} ${esc(l.date)}・${esc(l.studentName)}</b>${l.type === '請假' && l.kind ? ` <span class="pill ${l.kind === '病假' ? '' : 'warn'}">${esc(l.kind)}</span>` : ''}
         ${l.reasonText ? `<div class="muted" style="font-size:12.5px;margin:2px 0 0">原因：${esc(l.reasonText)}${l.at ? '（' + esc(l.at) + ' 申請）' : ''}</div>` : ''}
         ${l.noMakeup ? '<div class="muted" style="font-size:12.5px;color:#b45309;margin:2px 0 0">營隊課程不提供補課</div>' : l.deadline ? `<div class="muted" style="font-size:12.5px;color:#b45309;margin:2px 0 0">補課截止日：${esc(l.deadline)}</div>` : ''}
         ${l.linkedMakeupId ? `<div class="muted" style="color:var(--pri);font-weight:700;font-size:13px;margin:2px 0 0">已預約補課：單號 ${esc(l.linkedMakeupId)}</div>` : ''}
@@ -679,7 +679,7 @@ function scheduleCard(vis, h) { // #1 下一堂課與本期剩餘上課日
   const leaves = (h.leaves || []).filter(l => l.type === '請假' && (l.status === '已核准' || l.status === '待審核'));
   const swaps = (h.leaves || []).filter(l => l.type === '調課' && (l.status === '已核准' || l.status === '待審核'));
   const rows = vis.filter(s => s.status !== '結業').map(s => {
-    if (s.kind === '補課' || s.kind === '試上') { // 只列他預約／安排好的那幾天
+    if (s.kind === '補課' || s.kind === '試上' || s.kind === '單堂') { // 只列他預約／安排好的那幾天
       const vd = (h.leaves || []).filter(l => l.type === '補課' && l.studentId === s.studentId && (l.status === '已核准' || l.status === '待審核') && l.date >= today()).map(l => l.date).sort();
       return `<div class="item"><b>${esc(s.name)}</b>・${esc(s.grp || s.className)} <span class="pill gray">${esc(s.kind)}</span>
         ${vd.length ? `<div style="font-size:16px;font-weight:800;color:var(--pri);margin:6px 0 2px">${esc(s.kind)}日：${vd.map(d => esc(d) + '（週' + DN[dow(d) - 1] + '）').join('、')}</div><div class="muted" style="margin:0 0 6px">📍 ${esc(s.venue || CONFIG.VENUE)}</div>` : `<div class="muted" style="margin:4px 0 0">目前沒有預約的${esc(s.kind)}日期</div>`}</div>`;
@@ -977,7 +977,7 @@ function rosterHtml() {
   return S.list.map((x, i) => `<div class="item ${x.makeup ? 'makeup-item' : ''} ${x.leave ? 'leave-item' : ''}">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <div>
-        <b>${esc(x.name)}</b> ${x.grade ? `<span class="pill gray">${esc(x.grade)}</span>` : ''}${x.grp ? `<span class="pill gray">${esc(x.grp)}</span>` : ''}${x.kind ? `<span class="pill" style="background:#fce7f3;color:#be185d">${x.kind === '試上' ? '🆕 試上' : '🔁 補課生'}</span>` : ''}
+        <b>${esc(x.name)}</b> ${x.grade ? `<span class="pill gray">${esc(x.grade)}</span>` : ''}${x.grp ? `<span class="pill gray">${esc(x.grp)}</span>` : ''}${x.kind ? `<span class="pill" style="background:#fce7f3;color:#be185d">${x.kind === '試上' ? '🆕 試上' : x.kind === '單堂' ? '🎫 單堂' : '🔁 補課生'}</span>` : ''}
         ${x.makeup && !x.kind ? '<span class="pill" style="background:#fef3c7;color:#b45309">⭐ 補課（來別班上課）</span>' : ''}${x.swap ? `<span class="pill" style="background:#eff6ff;color:#2563eb">🔄 ${esc(x.swap)}</span>` : ''} 
         ${x.leave ? `<span class="pill warn">📝 事前請假（${esc(x.leaveReason || '已核准')}）</span>` : ''}
         ${x.saved ? `<span class="pill">${x.saved === '出席' ? '✓ 已出席' : esc(x.saved)}</span>` : ''}
@@ -1406,9 +1406,9 @@ async function addStudentUi() {
   const v = await dialog('新增學員', [
     { key: 'name', label: '學員姓名（必填）' },
     { key: 'classId', label: '班級', type: 'select', options: cs.map(c => [c.classId, c.name]) },
-    { key: 'kind', label: '學員類型', type: 'select', value: '', options: [['', '正式學員'], ['試上', '試上（體驗 1 堂）'], ['補課', '補課（來補課的學生，不固定每週來）']] },
-    { key: 'visitDate', label: '上課日期（選試上／補課才填；隔幾週再來，之後可再加日期）', type: 'date' },
-    { key: 'visitClassId', label: '上課的班級（試上／補課來上哪一班；不選＝上面的班級）', type: 'select', value: '', options: [['', '同上面的班級']].concat(cs.map(c => [c.classId, c.name])) },
+    { key: 'kind', label: '學員類型', type: 'select', value: '', options: [['', '正式學員'], ['試上', '試上（體驗 1 堂）'], ['補課', '補課（來補課的學生，不固定每週來）'], ['單堂', '單堂（單次繳費，只在指定日期來上課）']] },
+    { key: 'visitDate', label: '上課日期（選試上／補課／單堂才填；隔幾週再來，之後可再加日期）', type: 'date' },
+    { key: 'visitClassId', label: '上課的班級（試上／補課／單堂來上哪一班；不選＝上面的班級）', type: 'select', value: '', options: [['', '同上面的班級']].concat(cs.map(c => [c.classId, c.name])) },
     { key: 'balance', label: '初始堂數', type: 'number', ph: '留空＝0 堂（繳費核准後才加堂）；試上、補課留空＝1 堂', value: '' },
     { key: 'group', label: '班別（基礎／競技合開的班才選）', type: 'select', value: '', options: [['', '不分班別'], ['基礎班', '基礎班'], ['競技班', '競技班']] },
     { key: 'grade', label: '年級（教練點名時可看到）', type: 'select', value: '', options: gradeOpts },
@@ -1461,7 +1461,7 @@ async function manageStudent(id) {
       { key: 'classId', label: '班級', type: 'select', value: x.classId, options: (S.me.classes || []).map(c => [c.classId, c.name]) },
       { key: 'group', label: '班別（基礎／競技）', type: 'select', value: x.grp || '', options: [['', '不分班別'], ['基礎班', '基礎班'], ['競技班', '競技班']] },
       { key: 'grade', label: '年級（長大了在這裡改）', type: 'select', value: x.grade || '', options: gradeOpts },
-      { key: 'kind', label: '學員類型（試上轉正式請改成正式）', type: 'select', value: x.kind || '', options: [['', '正式學員'], ['試上', '試上'], ['補課', '補課']] },
+      { key: 'kind', label: '學員類型（試上轉正式請改成正式）', type: 'select', value: x.kind || '', options: [['', '正式學員'], ['試上', '試上'], ['補課', '補課'], ['單堂', '單堂']] },
       { key: 'phone', label: '緊急聯絡電話（必填）', type: 'tel', value: x.phone || '' },
       { key: 'note', label: '備註（過敏／傷病）', value: x.note || '' },
       { key: 'delta', label: '同時調整堂數（選填）', type: 'number', ph: '不調整就留空；加 7 堂填 7，扣 1 堂填 -1' },
