@@ -174,16 +174,18 @@ function goCamp(k) { flashEl([...document.querySelectorAll('[data-ca]')].find(x 
 const pill = s => `<span class="pill ${/退回|拒絕|缺席/.test(s) ? 'bad' : /取消/.test(s) ? 'gray' : /待/.test(s) ? 'warn' : ''}">${esc(s)}</span>`;
 const balT = b => b < 0 ? `欠 ${-b} 堂` : `剩 ${b} 堂`;
 const bal = b => (b <= 1 ? '⚠️ ' : '') + balT(b);
-const owedCore = (o, x) => { // 待補課說明（依請假是哪一期分開）；本期的待補課併在「第二期 N 堂」後面，不重複寫
-  if (!(o > 0)) return '';
-  const by = (x && x.owedBy) || [], cur = (x && x.curP) || '', known = by.filter(z => z.p), other = known.filter(z => z.p !== cur);
-  if (!other.length) return `含 ${o} 堂待補課`;
-  const inCur = o - other.reduce((a, z) => a + z.n, 0), rest = Number((x && x.balance) || 0) - o + inCur, parts = other.map(z => `${z.p}待補課 ${z.n} 堂`);
-  if (cur && rest > 0) parts.push(`${cur} ${rest} 堂` + (inCur > 0 ? `（含 ${inCur} 堂待補課）` : ''));
-  return parts.join('＋');
+const mdT = d => { const m = /^\d{4}-(\d{2})-(\d{2})/.exec(d || ''); return m ? Number(m[1]) + '/' + Number(m[2]) : d; };
+const owedLines = (o, x) => { // 請假後還沒補完的課，依「請假是哪一期」分開寫；最後解釋為什麼堂數沒有少
+  if (!(o > 0)) return [];
+  const by = ((x && x.owedBy) || []).slice().sort((a, b) => String(a.p).localeCompare(String(b.p), 'zh-Hant')), lines = by.map(z => {
+    const bk = z.booked || [], tot = (z.open || 0) + bk.length;
+    return `${z.p || ''}請假 ${tot} 堂` + (bk.length ? `，已預約 ${bk.map(mdT).join('、')} 補課` : '') + ((z.open || 0) > 0 ? `，${z.open} 堂還沒選補課日期` : '');
+  });
+  lines.push(`請假不扣堂數，補課出席後才會扣，所以目前還顯示剩 ${Number((x && x.balance) || 0)} 堂`);
+  return lines;
 };
-const owedT = (o, x) => o > 0 ? `（${owedCore(o, x)}）` : '';
-const owedLine = (o, x, st = '') => o > 0 ? `<div class="muted" style="margin:2px 0 0;font-size:12.5px;color:var(--warn);line-height:1.5;${st}">📌 ${esc(owedCore(o, x))}</div>` : '';
+const owedLine = (o, x, st = '') => o > 0 ? `<div style="margin:3px 0 0;font-size:12.5px;line-height:1.55;color:var(--warn);${st}">${owedLines(o, x).map((t, i, a) => i === a.length - 1 ? `<div class="muted" style="font-size:12px;color:#94a3b8">${esc(t)}</div>` : `<div>📌 ${esc(t)}</div>`).join('')}</div>` : '';
+const owedT = (o, x) => o > 0 ? `（${owedLines(o, x).slice(0, -1).join('；')}）` : '';
 const balPill = b => `<span class="pill ${b < 0 ? 'bad' : b <= 1 ? 'warn' : ''}">${bal(b)}</span>`;
 function toast(m) { const t = $('#toast'); t.textContent = m; t.className = 'show'; setTimeout(() => t.className = '', 2800); }
 
@@ -325,7 +327,7 @@ document.addEventListener('click', e => {
 
 const GRADES = ['幼稚園', '小一', '小二', '小三', '小四', '小五', '小六', '國一', '國二', '國三', '高中'];
 const gradeOpts = [['', '未填']].concat(GRADES.map(g => [g, g]));
-const FE_VER = '2026-11-18-r108';
+const FE_VER = '2026-11-18-r109';
 const GUIDE = {
   parent: [
     ['🎒 第一次使用：綁定孩子', ['輸入總教練給你的 6 碼「綁定碼」。', '第一次要填「家長真實姓名」和「聯絡電話」。', '有兄弟姊妹用同一組綁定碼，一次就全部綁好。', '爸爸媽媽可以各用自己的 LINE 綁同一位孩子。']],
