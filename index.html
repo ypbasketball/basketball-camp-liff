@@ -316,7 +316,7 @@ document.addEventListener('click', e => {
 
 const GRADES = ['幼稚園', '小一', '小二', '小三', '小四', '小五', '小六', '國一', '國二', '國三', '高中'];
 const gradeOpts = [['', '未填']].concat(GRADES.map(g => [g, g]));
-const FE_VER = '2026-11-18-r105';
+const FE_VER = '2026-11-18-r106';
 const GUIDE = {
   parent: [
     ['🎒 第一次使用：綁定孩子', ['輸入總教練給你的 6 碼「綁定碼」。', '第一次要填「家長真實姓名」和「聯絡電話」。', '有兄弟姊妹用同一組綁定碼，一次就全部綁好。', '爸爸媽媽可以各用自己的 LINE 綁同一位孩子。']],
@@ -995,7 +995,7 @@ function rosterHtml() {
         ${x.leave ? `<span class="pill warn">📝 事前請假（${esc(x.leaveReason || '已核准')}）</span>` : ''}
         ${x.saved ? `<span class="pill">${x.saved === '出席' ? '✓ 已出席' : esc(x.saved)}</span>` : ''}
       </div>
-      <span class="muted" style="margin:0;font-weight:700">${bal(x.balance)}</span></div>
+      <span class="muted" style="margin:0;font-weight:700">${bal(x.balance)}${owedT(x.owed)}</span></div>
     ${x.saved && x.by ? `<div class="muted" style="margin:2px 0 0;font-size:12.5px">${esc(x.by)}・${esc(x.at)} 已點名</div>` : ''}
     ${x.cnote ? `<div style="margin:8px 0 0;padding:9px 12px;border-radius:12px;background:#fff7d6;border:1px solid #f5d76e;font-weight:700;color:#7a5200">📌 總教練提醒：${esc(x.cnote)}</div>` : ''}
     ${S.me.role === 'admin' ? `<div style="margin:6px 0 0;display:flex;gap:6px"><button type="button" class="ghost mini" style="width:auto;padding:5px 12px;font-size:13px" onclick="editCoachNote(${i})">${x.cnote ? '✏️ 修改備註' : '📌 加備註'}</button>${x.cnote ? `<button type="button" class="ghost mini" style="width:auto;padding:5px 12px;font-size:13px" onclick="clearCoachNote(${i})">✅ 已處理，清除</button>` : ''}</div>` : ''}
