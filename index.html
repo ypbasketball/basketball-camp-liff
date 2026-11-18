@@ -315,7 +315,7 @@ document.addEventListener('click', e => {
 
 const GRADES = ['幼稚園', '小一', '小二', '小三', '小四', '小五', '小六', '國一', '國二', '國三', '高中'];
 const gradeOpts = [['', '未填']].concat(GRADES.map(g => [g, g]));
-const FE_VER = '2026-11-15-r103';
+const FE_VER = '2026-11-18-r104';
 const GUIDE = {
   parent: [
     ['🎒 第一次使用：綁定孩子', ['輸入總教練給你的 6 碼「綁定碼」。', '第一次要填「家長真實姓名」和「聯絡電話」。', '有兄弟姊妹用同一組綁定碼，一次就全部綁好。', '爸爸媽媽可以各用自己的 LINE 綁同一位孩子。']],
@@ -797,11 +797,14 @@ function campSignupCard(st, cl) { // 家長自己報名冬令營：每位常態�
   const pend = ((S.parentData && S.parentData.campApps) || []), camps = (cl || []).filter(c => c.camp); if (!camps.length) return '';
   const names = new Set(st.map(s => s.name)), kids = st.filter(s => !s.camp && !s.kind && !/（冬令營|（營隊/.test(s.name));
   const rows = kids.map(k => {
-    const base = k.name.replace(/（.*）$/, ''), blocks = camps.map(c => {
-      if (names.has(base + '（' + c.name.replace(/\s+/g, '') + '）')) return `<div class="muted" style="margin:6px 0">✅ ${esc(c.name)} 已報名成功</div>`;
-      if (pend.some(a => a.studentId === k.studentId && a.classId === c.classId)) return `<div style="margin:6px 0"><span class="pill warn">⏳ ${esc(c.name)} 等待總教練審核</span></div>`;
-      return `<div style="margin:8px 0;padding:10px 12px;border:1px solid #f3e8da;border-radius:12px;background:#fffaf3"><div style="font-size:16px;font-weight:800">${clsPill(c.name)}${c.tm ? `<span class="muted" style="font-weight:400">　🕗 ${esc(tmRange(c.tm, c.hours))}</span>` : ''}</div>${(c.periods || []).map(p => `<label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" class="cs_chk" data-kid="${esc(k.studentId)}" data-cid="${esc(c.classId)}" value="${esc(p.period)}"> <span><b>${esc(c.name)}</b>・${esc(p.label || p.period)}<span class="muted">（${p.lessons} 堂・$${Number(p.amount).toLocaleString()}）</span></span></label>`).join('')}${(c.periods || []).length ? '' : '<div class="muted">這個班目前沒有可報名的期別（課程日曆／價目表尚未設定）</div>'}</div>`;
-    }).join('');
+    const base = k.name.replace(/（.*）$/, ''), isDone = c => names.has(base + '（' + c.name.replace(/\s+/g, '') + '）'), isPend = c => pend.some(a => a.studentId === k.studentId && a.classId === c.classId);
+    const status = camps.map(c => isDone(c) ? `<div class="muted" style="margin:6px 0">✅ ${esc(c.name)} 已報名成功</div>` : isPend(c) ? `<div style="margin:6px 0"><span class="pill warn">⏳ ${esc(c.name)} 等待總教練審核</span></div>` : '').join('');
+    const open = camps.filter(c => !isDone(c) && !isPend(c)), perKeys = [...new Set(open.flatMap(c => (c.periods || []).map(q => q.period)))];
+    const optHtml = perKeys.map(pk => {
+      const rowsP = open.map(c => ({ c, q: (c.periods || []).find(q => q.period === pk) })).filter(x => x.q), q0 = rowsP[0].q;
+      return `<div style="margin:8px 0;padding:10px 12px;border:1px solid #f3e8da;border-radius:12px;background:#fffaf3"><div style="font-size:16px;font-weight:800;margin-bottom:4px">📅 ${esc(q0.label || pk)}<span class="muted" style="font-weight:400">　共 ${q0.lessons} 堂</span></div>${rowsP.map(({ c, q }) => `<label style="display:flex;gap:10px;align-items:center;margin:8px 0;padding:8px 10px;background:#fff;border-radius:10px"><input type="checkbox" class="cs_chk" data-kid="${esc(k.studentId)}" data-cid="${esc(c.classId)}" value="${esc(q.period)}"><span style="flex:1"><b>${esc(c.name)}</b>${c.tm ? `<span class="muted">　🕗 ${esc(tmRange(c.tm, c.hours))}</span>` : ''}</span><b style="color:var(--pri)">$${Number(q.amount).toLocaleString()}</b></label>`).join('')}</div>`;
+    }).join('') || (open.length ? '<div class="muted">這個班目前沒有可報名的期別（課程日曆／價目表尚未設定）</div>' : '');
+    const blocks = status + optHtml;
     const canSend = camps.some(c => !names.has(base + '（' + c.name.replace(/\s+/g, '') + '）') && !pend.some(a => a.studentId === k.studentId && a.classId === c.classId));
     return `<div style="margin:10px 0"><b>${esc(k.name)}</b>${blocks}${canSend ? `<button class="pri" data-act="campSignup" data-sid="${esc(k.studentId)}">送出 ${esc(k.name)} 的營隊報名申請 ➜</button>` : ''}</div>`;
   }).join('');
