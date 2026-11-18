@@ -174,7 +174,8 @@ function goCamp(k) { flashEl([...document.querySelectorAll('[data-ca]')].find(x 
 const pill = s => `<span class="pill ${/退回|拒絕|缺席/.test(s) ? 'bad' : /取消/.test(s) ? 'gray' : /待/.test(s) ? 'warn' : ''}">${esc(s)}</span>`;
 const balT = b => b < 0 ? `欠 ${-b} 堂` : `剩 ${b} 堂`;
 const bal = b => (b <= 1 ? '⚠️ ' : '') + balT(b);
-const balPill = b => `<span class="pill ${b < 0 ? 'bad' : b <= 1 ? 'warn' : ''}">${bal(b)}</span>`;
+const owedT = o => o > 0 ? `（含 ${o} 堂待補課）` : '';
+const balPill = (b, o = 0) => `<span class="pill ${b < 0 ? 'bad' : b <= 1 ? 'warn' : ''}">${bal(b)}${owedT(o)}</span>`;
 function toast(m) { const t = $('#toast'); t.textContent = m; t.className = 'show'; setTimeout(() => t.className = '', 2800); }
 
 function showLoading(msg = '資料處理中，請稍候…') {
@@ -315,7 +316,7 @@ document.addEventListener('click', e => {
 
 const GRADES = ['幼稚園', '小一', '小二', '小三', '小四', '小五', '小六', '國一', '國二', '國三', '高中'];
 const gradeOpts = [['', '未填']].concat(GRADES.map(g => [g, g]));
-const FE_VER = '2026-11-18-r104';
+const FE_VER = '2026-11-18-r105';
 const GUIDE = {
   parent: [
     ['🎒 第一次使用：綁定孩子', ['輸入總教練給你的 6 碼「綁定碼」。', '第一次要填「家長真實姓名」和「聯絡電話」。', '有兄弟姊妹用同一組綁定碼，一次就全部綁好。', '爸爸媽媽可以各用自己的 LINE 綁同一位孩子。']],
@@ -563,7 +564,7 @@ async function viewParent() {
   if (S.curKid !== 'ALL' && !st.some(s => s.studentId === S.curKid)) S.curKid = 'ALL';
 
   const regKids = st.filter(s => !s.camp), campKids = st.filter(s => s.camp), cn = x => String(x).replace(/^冬令營|^營隊/, '');
-  const tab = (s, label) => `<button class="kid-btn ${S.curKid === s.studentId ? 'active' : ''}" data-act="switchKid" data-id="${esc(s.studentId)}">${label} (${balT(s.balance)})</button>`;
+  const tab = (s, label) => `<button class="kid-btn ${S.curKid === s.studentId ? 'active' : ''}" data-act="switchKid" data-id="${esc(s.studentId)}">${label} (${balT(s.balance)}${owedT(s.owed)})</button>`;
   const kidTabs = st.length > 1 ? `<div class="kid-tabs">
     <button class="kid-btn ${S.curKid === 'ALL' ? 'active' : ''}" data-act="switchKid" data-id="ALL">全部 (${st.length})</button>
     ${regKids.map(s => tab(s, '👦 ' + esc(s.name))).join('')}</div>${campKids.length ? `<div class="muted" style="margin:0 0 4px;font-weight:700">🏕️ 冬令營</div><div class="kid-tabs">${campKids.map(s => tab(s, '🏕️ ' + esc(s.name.replace(/（.*）$/, '')) + '・' + esc(cn(s.className)))).join('')}</div>` : ''}` : '';
@@ -788,7 +789,7 @@ function statusRows(vis) { // 同一位孩子的常態班與冬令營合併成�
   const row = s => {
     const camp = s.camp, per = (s.campAllowed || []);
     const cn = x => String(x).replace(/^冬令營|^營隊/, ''), sub = camp ? `🏕️ <b>冬令營</b>：${per.length ? per.map(q => esc(cn(q)) + ' <b>' + esc(cn(s.className)) + '</b>').join('、') : esc(s.className)}` : `${esc(s.grp || s.className)}${s.grade ? '・' + esc(s.grade) : ''}${s.classDays && s.classDays.length ? '・' + dayTxt(s.classDays) : ''}`;
-    const pill = camp ? (s.balance > 0 || s.campPaid ? `<span class="pill">冬令營 剩 ${s.balance} 堂</span>` : `<span class="pill warn">冬令營・尚未匯款</span>`) : balPill(s.balance);
+    const pill = camp ? (s.balance > 0 || s.campPaid ? `<span class="pill">冬令營 剩 ${s.balance} 堂</span>` : `<span class="pill warn">冬令營・尚未匯款</span>`) : balPill(s.balance, s.owed);
     return `<div class="row" style="padding:6px 0"><div><span class="muted" style="margin:0">${sub}</span>${s.status === '結業' ? ' <span class="pill gray">已結業</span>' : ''}</div>${pill}</div>${makeupLine(s.studentId, S.parentData.h)}`;
   };
   return [...groups.entries()].map(([b, list]) => `<div style="margin:6px 0 12px;padding-bottom:6px;border-bottom:1px dashed #f0e7dd"><b style="font-size:16px">${esc(b)}</b>${list.map(row).join('')}</div>`).join('');
@@ -1408,7 +1409,7 @@ async function viewAdmin() {
       ((a.students || []).map(x => `<div class="row stu-row" data-q="${esc((x.name + x.id + x.className + (x.grp || '') + (x.grade || '')).toLowerCase())}"><div>
         <b>${esc(x.name)}</b> <span class="muted">${esc(x.className)}${x.grp ? '・' + esc(x.grp) : ''}${x.grade ? '・' + esc(x.grade) : ''}${x.kind ? '・' + esc(x.kind) : ''}</span>
         <div class="muted" style="margin:0;font-size:12.5px">${x.bound ? `已綁 ${x.bound} 個帳號` : '未綁定'}${x.status === '結業' ? '・已結業' : ''}${x.note ? '・⚠️ ' + esc(x.note) : ''}</div></div>
-        <div style="display:flex;align-items:center;gap:8px">${balPill(x.balance)}<button class="ghost mini" data-act="manageStu" data-id="${esc(x.id)}">管理</button></div></div>`).join('') || '<p class="muted">尚無學員資料</p>'), (a.students || []).length + ' 位', `<button class="ghost mini" onclick="run(this,addStudentUi)">＋ 新增學員</button>`) +
+        <div style="display:flex;align-items:center;gap:8px">${balPill(x.balance, x.owed)}<button class="ghost mini" data-act="manageStu" data-id="${esc(x.id)}">管理</button></div></div>`).join('') || '<p class="muted">尚無學員資料</p>'), (a.students || []).length + ' 位', `<button class="ghost mini" onclick="run(this,addStudentUi)">＋ 新增學員</button>`) +
     foldCard('adj', '🧾 最近堂數調整', (a.adjustLogs || []).map(r => `<div class="row"><span>${esc(r.date)} <b>${esc(r.name)}</b> <span class="muted">${esc(r.reason)}・${esc(r.by)}</span></span>
       <span class="pill ${r.delta < 0 ? 'bad' : ''}">${r.delta > 0 ? '+' : ''}${r.delta} → ${r.after}</span></div>`).join('') || '<p class="muted">尚無調整紀錄</p>', (a.adjustLogs || []).length + ' 筆') +
     foldify('rec', card('🗂️ 最近點名紀錄', (a.recent || []).map(r => `<div class="row"><span>${esc(r.date)} <b>${esc(r.name)}</b> <span class="muted">${esc(r.className)}・${esc(r.by)}</span></span>${pill(r.status)}</div>`).join('') || '<p class="muted">尚無點名紀錄</p>')) +
@@ -1477,7 +1478,7 @@ async function addStudentUi() {
 
 async function manageStudent(id) {
   const x = (S.adm.students || []).find(s => s.id === id); if (!x) return;
-  const k = await menu(`${x.name}（${x.className}${x.grp ? '・' + x.grp : ''}）・${balT(x.balance)}`, [
+  const k = await menu(`${x.name}（${x.className}${x.grp ? '・' + x.grp : ''}）・${balT(x.balance)}${owedT(x.owed)}`, [
     ['edit', '📝 修改學員資料（姓名／班級／電話／備註／可同時調堂數）'],
     ...(!x.kind && !/（冬令營/.test(x.name) && !(S.me.classes || []).some(c => c.classId === x.classId && c.camp) ? [['camp', '🏕️ 加報營隊（幫他新增一筆營隊學員，共用綁定碼）']] : []),
     ...(x.kind ? [['visit', `📅 新增${x.kind}上課日期（不是每週來，要來的那天再加）`]] : []),
