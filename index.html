@@ -327,7 +327,7 @@ document.addEventListener('click', e => {
 
 const GRADES = ['幼稚園', '小一', '小二', '小三', '小四', '小五', '小六', '國一', '國二', '國三', '高中'];
 const gradeOpts = [['', '未填']].concat(GRADES.map(g => [g, g]));
-const FE_VER = '2026-11-22-r112';
+const FE_VER = '2026-11-22-r113';
 const GUIDE = {
   parent: [
     ['🎒 第一次使用：綁定孩子', ['輸入總教練給你的 6 碼「綁定碼」。', '第一次要填「家長真實姓名」和「聯絡電話」。', '有兄弟姊妹用同一組綁定碼，一次就全部綁好。', '爸爸媽媽可以各用自己的 LINE 綁同一位孩子。']],
@@ -608,6 +608,7 @@ async function viewParent() {
 
   $('#app').innerHTML = duesBanner() + noticeBanner() + kidTabs +
     card('⛹️ 孩子的課務狀態', statusRows(vis) || '<p class="muted">尚未綁定學員</p>') +
+    visitCard(vis, h) +
     card('📝 我要請假', `
       <select id="leave_sid" onchange="onLeaveKid(this.value)">${opt}</select>
       <select id="leave_reason_type">
@@ -639,7 +640,6 @@ async function viewParent() {
       <select id="sw_cls"></select>
       <input id="sw_rsn" placeholder="原因說明（選填，例如：早上有事）">
       <button class="pri" onclick="run(this,doSubmitSwap)">送出調課申請 ➜</button>`) +
-    visitCard(vis, h) +
     card('🏀 預約補課', (st.some(s => s.camp) ? `<div style="margin:0 0 10px;padding:10px 12px;border-radius:12px;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-weight:700">⚠️ 冬令營課程一律不提供補課；下方補課功能只適用常態班。</div>` : '') + makeupForm + `
       ${st.some(s => !s.camp) ? `<div class="rules-box"><b>📌 115年常態班請假補課規範：</b><ol>
         <li><b>病假單堂</b>：請提供看診收據（接受上課日前後二日）。</li>
