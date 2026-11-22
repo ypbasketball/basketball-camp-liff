@@ -327,7 +327,7 @@ document.addEventListener('click', e => {
 
 const GRADES = ['幼稚園', '小一', '小二', '小三', '小四', '小五', '小六', '國一', '國二', '國三', '高中'];
 const gradeOpts = [['', '未填']].concat(GRADES.map(g => [g, g]));
-const FE_VER = '2026-11-18-r109';
+const FE_VER = '2026-11-22-r110';
 const GUIDE = {
   parent: [
     ['🎒 第一次使用：綁定孩子', ['輸入總教練給你的 6 碼「綁定碼」。', '第一次要填「家長真實姓名」和「聯絡電話」。', '有兄弟姊妹用同一組綁定碼，一次就全部綁好。', '爸爸媽媽可以各用自己的 LINE 綁同一位孩子。']],
@@ -433,7 +433,7 @@ function makeupLine(sid, h) { // 課務狀態下方：請假幾堂、還有幾�
   const bk = (h.leaves || []).filter(l => l.type === '補課' && l.studentId === sid && (l.status === '已核准' || l.status === '待審核') && l.date >= t).map(l => l.date).sort();
   if (!o.total && !bk.length) return '';
   const notes = [o.lost > 0 ? `事假每期只能補 1 堂，另有 ${o.lost} 堂事假無法補課` : '', o.expired > 0 ? `${o.expired} 堂已超過補課期限` : ''].filter(Boolean);
-  return `<div style="margin:2px 0 10px">${o.total ? `<div class="muted" style="margin:3px 0;font-size:13.5px">請假共 ${o.total} 堂・已補／已預約 ${o.made} 堂</div>` : ''}${o.can ? `<div style="margin:3px 0"><span class="pill warn">📌 還有 ${o.can} 堂可補課（尚未預約）</span> <span class="muted" style="font-size:12.5px">請到下方「預約補課」選日期</span></div>` : ''}${bk.length ? `<div style="margin:3px 0"><span class="pill">✅ 已預約${((S.me.students || []).find(x => x.studentId === sid) || {}).kind === '試上' ? '試上' : '補課'}</span> <b style="font-size:13.5px">${bk.map(d => esc(d.slice(5)) + '（週' + DN[dow(d) - 1] + '）').join('、')}</b></div>` : ''}${notes.length ? `<div style="margin:3px 0;font-size:12.5px;color:#b45309">※ ${notes.join('；')}</div>` : ''}</div>`;
+  return `<div style="margin:2px 0 10px">${o.total ? `<div class="muted" style="margin:3px 0;font-size:13.5px">請假共 ${o.total} 堂・已補／已預約 ${o.made} 堂</div>` : ''}${o.can ? `<div style="margin:3px 0"><span class="pill warn">📌 還有 ${o.can} 堂可補課（尚未預約）</span> <span class="muted" style="font-size:12.5px">請到下方「預約補課」選日期</span></div>` : ''}${bk.length ? `<div style="margin:3px 0"><span class="pill">✅ 已預約${({ '試上': '試上', '單堂': '上課' })[((S.me.students || []).find(x => x.studentId === sid) || {}).kind] || '補課'}</span> <b style="font-size:13.5px">${bk.map(d => esc(d.slice(5)) + '（週' + DN[dow(d) - 1] + '）').join('、')}</b></div>` : ''}${notes.length ? `<div style="margin:3px 0;font-size:12.5px;color:#b45309">※ ${notes.join('；')}</div>` : ''}</div>`;
 }
 function owedStat(sid, h) { // 這位孩子的請假／補課總覽：{總請假, 還可補, 事假超過額度不能補, 已過期, 已補完}
   const t = today(), ls = (h.leaves || []).filter(l => l.type === '請假' && l.status === '已核准' && l.studentId === sid && !l.noMakeup); // 營隊請假不補課，不算「待補」
