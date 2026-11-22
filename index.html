@@ -327,7 +327,7 @@ document.addEventListener('click', e => {
 
 const GRADES = ['幼稚園', '小一', '小二', '小三', '小四', '小五', '小六', '國一', '國二', '國三', '高中'];
 const gradeOpts = [['', '未填']].concat(GRADES.map(g => [g, g]));
-const FE_VER = '2026-11-22-r111';
+const FE_VER = '2026-11-22-r112';
 const GUIDE = {
   parent: [
     ['🎒 第一次使用：綁定孩子', ['輸入總教練給你的 6 碼「綁定碼」。', '第一次要填「家長真實姓名」和「聯絡電話」。', '有兄弟姊妹用同一組綁定碼，一次就全部綁好。', '爸爸媽媽可以各用自己的 LINE 綁同一位孩子。']],
@@ -639,6 +639,7 @@ async function viewParent() {
       <select id="sw_cls"></select>
       <input id="sw_rsn" placeholder="原因說明（選填，例如：早上有事）">
       <button class="pri" onclick="run(this,doSubmitSwap)">送出調課申請 ➜</button>`) +
+    visitCard(vis, h) +
     card('🏀 預約補課', (st.some(s => s.camp) ? `<div style="margin:0 0 10px;padding:10px 12px;border-radius:12px;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-weight:700">⚠️ 冬令營課程一律不提供補課；下方補課功能只適用常態班。</div>` : '') + makeupForm + `
       ${st.some(s => !s.camp) ? `<div class="rules-box"><b>📌 115年常態班請假補課規範：</b><ol>
         <li><b>病假單堂</b>：請提供看診收據（接受上課日前後二日）。</li>
@@ -697,6 +698,40 @@ function noticeBanner() { // 停課公告（家長）
   return `<div class="card" style="background:#fff1f2;border-color:#fecdd3"><h2 style="color:#be123c">🚫 停課公告</h2>
     ${ns.map(n => `<div class="row" style="padding:8px 0"><div><b>${esc(n.date)}（週${DN[dow(n.date) - 1]}）${esc(n.className)}停課</b><div class="muted" style="margin:0">原因：${esc(n.reason)}</div></div></div>`).join('')}
     <p class="muted" style="margin:6px 0 0;font-size:13px">已自動幫孩子請假，不計事假次數，可到下方「預約補課」安排補課。</p></div>`;
+}
+
+function visitDates(st, h, n = 12) { // 單堂學員可選的上課日：課程日曆（或班級星期）、沒停課、還沒預約過
+  const booked = new Set((h.leaves || []).filter(l => l.type === '補課' && l.studentId === st.studentId && (l.status === '已核准' || l.status === '待審核')).map(l => l.date));
+  const cal = (S.parentData && S.parentData.cal) || [], out = []; let d = today();
+  for (let i = 0; i < 200 && out.length < n; i++, d = addDays(d, 1)) {
+    if ((st.classDays || []).length && !(st.classDays).includes(dow(d))) continue;
+    if (cal.length && !cal.includes(d)) continue;
+    if (booked.has(d) || noticeOf(st, d)) continue;
+    out.push(d);
+  }
+  return out;
+}
+function visitCard(vis, h) { // 單堂學員：自己選上課日期
+  const ones = (vis || []).filter(s => s.kind === '單堂' && s.status !== '結業'); if (!ones.length) return '';
+  const t = today(), pend = s => (h.leaves || []).filter(l => l.type === '補課' && l.studentId === s.studentId && (l.status === '已核准' || l.status === '待審核') && l.date >= t).length;
+  const sid0 = ones[0].studentId;
+  return card('🎫 預約上課日期（單堂）', `<p class="muted" style="margin:0 0 8px;font-size:13.5px">單堂學員請在這裡自己選哪一天來上課。選的日期會直接登記，不用等審核；要改日期請到下方「申請紀錄」取消後重選。</p>
+    ${ones.map(s => { const free = Math.max(0, (s.balance || 0) - pend(s)); return `<div class="muted" style="margin:3px 0;font-size:13.5px"><b>${esc(s.name)}</b>：已繳 ${s.balance || 0} 堂・已預約 ${pend(s)} 堂・<b style="color:var(--pri)">還可預約 ${free} 堂</b></div>`; }).join('')}
+    <select id="bv_sid" onchange="bvRefresh()">${ones.map(s => `<option value="${esc(s.studentId)}">${esc(s.name)}</option>`).join('')}</select>
+    <select id="bv_date">${visitDates(ones[0], h).map(d => `<option value="${d}">${d}（週${DN[dow(d) - 1]}）</option>`).join('') || '<option value="">近期沒有可選的上課日</option>'}</select>
+    <button class="pri" onclick="run(this,doBookVisit)">預約這一天來上課 ➜</button>`);
+}
+function bvRefresh() {
+  const sid = $('#bv_sid').value, s = (S.me.students || []).find(x => x.studentId === sid), h = (S.parentData && S.parentData.h) || {};
+  $('#bv_date').innerHTML = (s ? visitDates(s, h) : []).map(d => `<option value="${d}">${d}（週${DN[dow(d) - 1]}）</option>`).join('') || '<option value="">近期沒有可選的上課日</option>';
+}
+async function doBookVisit() {
+  const sid = $('#bv_sid').value, d = $('#bv_date').value, s = (S.me.students || []).find(x => x.studentId === sid);
+  if (!sid || !d) throw new Error('請選擇學員與上課日期');
+  if (!(await ask(`請確認要預約這一堂：\n\n學員：${s ? s.name : ''}\n上課日期：${d}（週${DN[dow(d) - 1]}）\n班級：${s ? s.className : ''}\n\n送出後直接登記。`))) return;
+  await api('bookVisit', { studentId: sid, date: d });
+  render();
+  setTimeout(() => toast('已預約 ' + d + ' 上課'), 100);
 }
 function scheduleCard(vis, h) { // #1 下一堂課與本期剩餘上課日
   const leaves = (h.leaves || []).filter(l => l.type === '請假' && (l.status === '已核准' || l.status === '待審核'));
