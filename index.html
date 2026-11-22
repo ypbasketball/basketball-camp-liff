@@ -327,7 +327,7 @@ document.addEventListener('click', e => {
 
 const GRADES = ['幼稚園', '小一', '小二', '小三', '小四', '小五', '小六', '國一', '國二', '國三', '高中'];
 const gradeOpts = [['', '未填']].concat(GRADES.map(g => [g, g]));
-const FE_VER = '2026-11-22-r113';
+const FE_VER = '2026-11-22-r114';
 const GUIDE = {
   parent: [
     ['🎒 第一次使用：綁定孩子', ['輸入總教練給你的 6 碼「綁定碼」。', '第一次要填「家長真實姓名」和「聯絡電話」。', '有兄弟姊妹用同一組綁定碼，一次就全部綁好。', '爸爸媽媽可以各用自己的 LINE 綁同一位孩子。']],
@@ -431,7 +431,7 @@ function classDates(st, n = 10) {
 function makeupLine(sid, h) { // 課務狀態下方：請假幾堂、還有幾堂要補、哪幾天已經預約補課（只要有請假紀錄或補課預約就會顯示）
   const t = today(), o = owedStat(sid, h);
   const linkedIds = new Set((h.leaves || []).map(l => l.linkedMakeupId).filter(Boolean)); // 有對應請假單的才是「補課」，沒有的就是預約上課（單堂）
-  const bkL = (h.leaves || []).filter(l => l.type === '補課' && l.studentId === sid && (l.status === '已核准' || l.status === '待審核') && l.date >= t), bk = bkL.map(l => l.date).sort();
+  const bkL = (h.leaves || []).filter(l => l.type === '補課' && l.studentId === sid && (l.status === '已核准' || l.status === '待審核') && (l.date > t || (l.date === t && !(h.attendances || []).some(a => a.studentId === sid && a.date === t)))), bk = bkL.map(l => l.date).sort();
   const bkWord = ((S.me.students || []).find(x => x.studentId === sid) || {}).kind === '試上' ? '試上' : (bkL.length && bkL.every(l => !linkedIds.has(l.id)) ? '上課' : '補課');
   if (!o.total && !bk.length) return '';
   const notes = [o.lost > 0 ? `事假每期只能補 1 堂，另有 ${o.lost} 堂事假無法補課` : '', o.expired > 0 ? `${o.expired} 堂已超過補課期限` : ''].filter(Boolean);
@@ -713,10 +713,10 @@ function visitDates(st, h, n = 12) { // 單堂學員可選的上課日：課程�
 }
 function visitCard(vis, h) { // 單堂學員：自己選上課日期
   const ones = (vis || []).filter(s => s.kind === '單堂' && s.status !== '結業'); if (!ones.length) return '';
-  const t = today(), pend = s => (h.leaves || []).filter(l => l.type === '補課' && l.studentId === s.studentId && (l.status === '已核准' || l.status === '待審核') && l.date >= t).length;
+  const t = today(), pend = s => (h.leaves || []).filter(l => l.type === '補課' && l.studentId === s.studentId && (l.status === '已核准' || l.status === '待審核') && (l.date > t || (l.date === t && !(h.attendances || []).some(a => a.studentId === s.studentId && a.date === t)))).length;
   const sid0 = ones[0].studentId;
   return card('🎫 預約上課日期（單堂）', `<p class="muted" style="margin:0 0 8px;font-size:13.5px">單堂學員請在這裡自己選哪一天來上課。選的日期會直接登記，不用等審核；要改日期請到下方「申請紀錄」取消後重選。</p>
-    ${ones.map(s => { const free = Math.max(0, (s.balance || 0) - pend(s)); return `<div class="muted" style="margin:3px 0;font-size:13.5px"><b>${esc(s.name)}</b>：已繳 ${s.balance || 0} 堂・已預約 ${pend(s)} 堂・<b style="color:var(--pri)">還可預約 ${free} 堂</b></div>`; }).join('')}
+    ${ones.map(s => { const free = Math.max(0, (s.balance || 0) - pend(s)); return `<div class="muted" style="margin:3px 0;font-size:13.5px"><b>${esc(s.name)}</b>：剩餘 ${s.balance || 0} 堂・已預約還沒上 ${pend(s)} 堂・<b style="color:var(--pri)">還可預約 ${free} 堂</b></div>`; }).join('')}
     <select id="bv_sid" onchange="bvRefresh()">${ones.map(s => `<option value="${esc(s.studentId)}">${esc(s.name)}</option>`).join('')}</select>
     <select id="bv_date">${visitDates(ones[0], h).map(d => `<option value="${d}">${d}（週${DN[dow(d) - 1]}）</option>`).join('') || '<option value="">近期沒有可選的上課日</option>'}</select>
     <button class="pri" onclick="run(this,doBookVisit)">預約這一天來上課 ➜</button>`);
