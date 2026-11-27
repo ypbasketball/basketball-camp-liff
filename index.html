@@ -327,7 +327,7 @@ document.addEventListener('click', e => {
 
 const GRADES = ['幼稚園', '小一', '小二', '小三', '小四', '小五', '小六', '國一', '國二', '國三', '高中'];
 const gradeOpts = [['', '未填']].concat(GRADES.map(g => [g, g]));
-const FE_VER = '2026-11-22-r114';
+const FE_VER = '2026-11-27-r115';
 const GUIDE = {
   parent: [
     ['🎒 第一次使用：綁定孩子', ['輸入總教練給你的 6 碼「綁定碼」。', '第一次要填「家長真實姓名」和「聯絡電話」。', '有兄弟姊妹用同一組綁定碼，一次就全部綁好。', '爸爸媽媽可以各用自己的 LINE 綁同一位孩子。']],
@@ -844,7 +844,7 @@ function statusRows(vis) { // 同一位孩子的常態班與冬令營合併成�
 }
 function campSignupCard(st, cl) { // 家長自己報名冬令營：每位常態班孩子，勾選要報的「班級 × 期別」（可多選），一次送出申請
   const pend = ((S.parentData && S.parentData.campApps) || []), camps = (cl || []).filter(c => c.camp); if (!camps.length) return '';
-  const names = new Set(st.map(s => s.name)), kids = st.filter(s => !s.camp && !s.kind && !/（冬令營|（營隊/.test(s.name));
+  const names = new Set(st.map(s => s.name)), kids = st.filter(s => !s.camp && (!s.kind || s.kind === '補課') && !/（冬令營|（營隊/.test(s.name));
   const rows = kids.map(k => {
     const base = k.name.replace(/（.*）$/, ''), isDone = c => names.has(base + '（' + c.name.replace(/\s+/g, '') + '）'), isPend = c => pend.some(a => a.studentId === k.studentId && a.classId === c.classId);
     const status = camps.map(c => isDone(c) ? `<div class="muted" style="margin:6px 0">✅ ${esc(c.name)} 已報名成功</div>` : isPend(c) ? `<div style="margin:6px 0"><span class="pill warn">⏳ ${esc(c.name)} 等待總教練審核</span></div>` : '').join('');
@@ -1529,7 +1529,7 @@ async function manageStudent(id) {
   const x = (S.adm.students || []).find(s => s.id === id); if (!x) return;
   const k = await menu(`${x.name}（${x.className}${x.grp ? '・' + x.grp : ''}）・${balT(x.balance)}${owedT(x.owed, x)}`, [
     ['edit', '📝 修改學員資料（姓名／班級／電話／備註／可同時調堂數）'],
-    ...(!x.kind && !/（冬令營/.test(x.name) && !(S.me.classes || []).some(c => c.classId === x.classId && c.camp) ? [['camp', '🏕️ 加報營隊（幫他新增一筆營隊學員，共用綁定碼）']] : []),
+    ...((!x.kind || x.kind === '補課') && !/（冬令營/.test(x.name) && !(S.me.classes || []).some(c => c.classId === x.classId && c.camp) ? [['camp', '🏕️ 加報營隊（幫他新增一筆營隊學員，共用綁定碼）']] : []),
     ...(x.kind ? [['visit', `📅 新增${x.kind}上課日期（不是每週來，要來的那天再加）`]] : []),
     ['adj', '✏️ 手動調整堂數'],
     ['unbind', `🔗 解除家長綁定（目前 ${x.bound} 個帳號）`],
